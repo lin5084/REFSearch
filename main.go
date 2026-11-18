@@ -86,7 +86,7 @@ func getMergeMap(f *excelize.File, sheet string) (map[string]*MergeInfo, error) 
 	return mergeCellMap, nil
 }
 
-// getMergedCellValue 读取合并单元格，取首格值
+// getMergedCellValue 读取合并单元格，取合并块首格的值
 func getMergedCellValue(f *excelize.File, sheet string, row int, col int, mergeCellMap map[string]*MergeInfo) (string, error) {
 	key := fmt.Sprintf("%d-%d", row, col)
 	mi, ok := mergeCellMap[key]
@@ -137,7 +137,6 @@ func scanFile(path string, targetPart string, targetRefsLower []string) ([]Match
 	if err != nil {
 		return nil, err
 	}
-	const colA = 1
 	const colF = 6
 	maxRow := len(rows)
 	var hits []MatchItem
@@ -149,11 +148,8 @@ func scanFile(path string, targetPart string, targetRefsLower []string) ([]Match
 		if len(row) > 0 {
 			aVal = strings.TrimSpace(row[0])
 		}
-		// 判断F列是否是合并子行：子行跳过，避免重复统计
-		keyF := fmt.Sprintf("%d-%d", excelRow, colF)
-		if mi, ok := mergeCellMap[keyF]; ok && mi.startRow != excelRow {
-			continue
-		}
+
+		// ✅【重点改动】不再跳过F列合并子行！合并块内每一行都继承F的位号，参与检索
 		fVal, errF := getMergedCellValue(f, sheet, excelRow, colF, mergeCellMap)
 		if errF != nil {
 			fVal = ""
@@ -161,10 +157,11 @@ func scanFile(path string, targetPart string, targetRefsLower []string) ([]Match
 		fVal = strings.TrimSpace(fVal)
 		refList := splitRefDes(fVal)
 		refLower := toLowerAll(refList)
-		// 料号匹配（区分大小写）
+
 		if aVal != targetPart {
 			continue
 		}
+
 		// 全部目标位号都必须存在（AND）
 		allFound := true
 		for _, want := range targetRefsLower {
@@ -239,19 +236,18 @@ func main() {
 		allHits = append(allHits, hits...)
 	}
 
-	// 输出文本
-	title := fmt.Sprintf("要查找的“%s=%s”在以下BOM中：", targetPart, strings.Join(targetRefs, ","))
-	var outLines []string
-	outLines = append(outLines, title)
-	for _, item := range allHits {
-		line := fmt.Sprintf("%s 第%d行", item.fileName, item.rowNo)
-		outLines = append(outLines, line)
+	var outText string
+	title := fmt.Sprintf("要查找的“%s=%s”", targetPart, strings.Join(targetRefs, ","))
+	if len(allHits) == 0 {
+		outText = title + "不存在"
+	} else {
+		outText = title + "在以下BOM中：\r\n"
+		for _, item := range allHits {
+			outText += fmt.Sprintf("%s 第%d行\r\n", item.fileName, item.rowNo)
+		}
 	}
 
-	outText := strings.Join(outLines, "\r\n")
 	fmt.Println(outText)
-
-	// 写入 result.txt
 	err = os.WriteFile("result.txt", []byte(outText), 0644)
 	if err != nil {
 		fmt.Printf("\n写入result.txt失败：%v\n", err)
