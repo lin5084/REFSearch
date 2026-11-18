@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strings"
 
 	"github.com/xuri/excelize/v2"
@@ -80,7 +79,7 @@ func getMergeMap(f *excelize.File, sheet string) (map[string]*MergeInfo, error) 
 		for r := rowS; r <= rowE; r++ {
 			for c := colS; c <= colE; c++ {
 				key := fmt.Sprintf("%d-%d", r, c)
-				mergeCellMap[key] = *mi
+				mergeCellMap[key] = mi
 			}
 		}
 	}
@@ -88,7 +87,7 @@ func getMergeMap(f *excelize.File, sheet string) (map[string]*MergeInfo, error) 
 }
 
 // getMergedCellValue 读取合并单元格，取首格值
-func getMergedCellValue(f *excelize.File, sheet string, row int, col int, mergeCellMap map[string]MergeInfo) (string, error) {
+func getMergedCellValue(f *excelize.File, sheet string, row int, col int, mergeCellMap map[string]*MergeInfo) (string, error) {
 	key := fmt.Sprintf("%d-%d", row, col)
 	mi, ok := mergeCellMap[key]
 	cellAxis, _ := excelize.CoordinatesToCellName(col, row)
@@ -162,7 +161,7 @@ func scanFile(path string, targetPart string, targetRefsLower []string) ([]Match
 		fVal = strings.TrimSpace(fVal)
 		refList := splitRefDes(fVal)
 		refLower := toLowerAll(refList)
-		// 料号匹配（区分大小写，和你原来BOM工具一致）
+		// 料号匹配（区分大小写）
 		if aVal != targetPart {
 			continue
 		}
